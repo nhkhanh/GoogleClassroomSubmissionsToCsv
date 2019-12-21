@@ -14,13 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-  // [START classroom_quickstart]
+// [START classroom_quickstart]
 const fs = require('fs');
 const readline = require('readline');
 const { google } = require('googleapis');
 const Json2csvParser = require('json2csv').Parser;
 
-const COURSE_ID = 16576321386;
 const EXPORT_DIRECTORY = 'export';
 // If modifying these scopes, delete token.json.
 const SCOPES = ['https://www.googleapis.com/auth/classroom.courses.readonly',
@@ -50,7 +49,7 @@ fs.readFile('credentials.json', (err, content) => {
 function authorize(credentials, callback) {
   const { client_secret, client_id, redirect_uris } = credentials.installed;
   const oAuth2Client = new google.auth.OAuth2(
-    client_id, client_secret, redirect_uris[0]);
+  client_id, client_secret, redirect_uris[0]);
 
   // Check if we have previously stored a token.
   fs.readFile(TOKEN_PATH, (err, token) => {
@@ -96,44 +95,67 @@ function getNewToken(oAuth2Client, callback) {
  *
  * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
  */
-function exportToCsvs(auth) {
-  if (!fs.existsSync(EXPORT_DIRECTORY)){
+async function exportToCsvs(auth) {
+  if (!fs.existsSync(EXPORT_DIRECTORY)) {
     fs.mkdirSync(EXPORT_DIRECTORY);
   }
   const classroom = google.classroom({ version: 'v1', auth });
-  classroom.courses.courseWork.list({ courseId: COURSE_ID }, (err, res) => {
-    if (err) {
-      console.log(err);
-      return;
-    }
-    res.data.courseWork.forEach((courseWork => {
-      classroom.courses.courseWork.studentSubmissions.list({
-          courseId: COURSE_ID,
-          courseWorkId: courseWork.id,
-        },
-        (err, res) => {
-          // console.log(res.data.studentSubmissions);
-          const prune = res.data.studentSubmissions
+  classroom.courses.list((err, res) => {
+    console.log('Courses list:');
+    console.dir(res.data.courses.map(course => ({ id: course.id, name: course.name })),
+    { depth: null });
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question('Enter course id: ', (courseId) => {
+      rl.close();
+      classroom.courses.courseWork.list({ courseId }, (err, res) => {
+        if (err) {
+          console.log(err);
+          return;
+        }
+        res.data.courseWork.forEach((courseWork => {
+          classroom.courses.courseWork.studentSubmissions.list({
+            courseId,
+            courseWorkId: courseWork.id,
+          },
+          (err, res) => {
+            if (err) {
+              console.log(err);
+              return;
+            }
+            if (!res)
+              return;
+            const prune = res.data.studentSubmissions
             .filter(s => s.assignmentSubmission.attachments)
             .map(submission => {
               return {
                 updateTime: submission.updateTime, state: submission.state, late: submission.late,
                 files: submission.assignmentSubmission.attachments && submission.assignmentSubmission.attachments.reduce(
-                  (acc, current) => acc += (current.driveFile ? (current.driveFile.title + ',') : ''),
-                  ''),
+                (acc, current) => acc += (current.driveFile ? (current.driveFile.title + ',') : ''),
+                ''),
               };
             });
-          const parser = new Json2csvParser();
-          const csv = parser.parse(prune);
-          const fileName = `./${EXPORT_DIRECTORY}/${courseWork.title}.csv`;
+            if (!prune || !prune.length) {
+              console.log('Ignored no submission course work: ', courseWork.title, '');
+              return;
+            }
+            const parser = new Json2csvParser();
+            const csv = parser.parse(prune);
+            const fileName = `./${EXPORT_DIRECTORY}/${courseWork.title}.csv`;
 
-          fs.writeFile(fileName, csv, err => {
-            if (err)
-              console.log(err);
-            else
-              console.log(`${fileName} created!`);
+            fs.writeFile(fileName, csv, err => {
+              if (err)
+                console.log(err);
+              else
+                console.log(`${fileName} created!`);
+            });
           });
-        });
-    }));
+        }));
+      });
+    });
   });
+
+
 }
