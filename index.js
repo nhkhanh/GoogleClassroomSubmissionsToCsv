@@ -102,8 +102,7 @@ async function exportToCsvs(auth) {
   const classroom = google.classroom({ version: 'v1', auth });
   classroom.courses.list((err, res) => {
     console.log('Courses list:');
-    console.dir(res.data.courses.map(course => ({ id: course.id, name: course.name })),
-    { depth: null });
+    console.table(res.data.courses.map(course => ({ id: course.id, name: course.name })));
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -116,6 +115,11 @@ async function exportToCsvs(auth) {
           return;
         }
         res.data.courseWork.forEach((courseWork => {
+          const deadline = new Date(courseWork.dueDate.year,
+          courseWork.dueDate.month - 1,
+          courseWork.dueDate.day,
+          courseWork.dueTime.hours - new Date().getTimezoneOffset() / 60,
+          courseWork.dueTime.minutes || 0);
           classroom.courses.courseWork.studentSubmissions.list({
             courseId,
             courseWorkId: courseWork.id,
@@ -127,14 +131,24 @@ async function exportToCsvs(auth) {
             }
             if (!res)
               return;
+            let rowIndex = 1;
             const prune = res.data.studentSubmissions
             .filter(s => s.assignmentSubmission.attachments)
             .map(submission => {
+              const updateTime = new Date(submission.updateTime);
+              rowIndex++;
               return {
-                updateTime: submission.updateTime, state: submission.state, late: submission.late,
+                updateTime: toExcelDate(updateTime),
+                state: submission.state,
+                late: submission.late,
                 files: submission.assignmentSubmission.attachments && submission.assignmentSubmission.attachments.reduce(
                 (acc, current) => acc += (current.driveFile ? (current.driveFile.title + ',') : ''),
                 ''),
+                deadline: toExcelDate(deadline),
+                lateHours: `=(A${rowIndex} - E${rowIndex}) * 60`,
+                penalty: `=IF(F${rowIndex} <= 0, 1, IF(F${rowIndex} <= 2, 0.8, IF(F${rowIndex} <= 24, 0.5, 0)))`,
+                finalGrade: `=G${rowIndex} * I${rowIndex}`,
+                actualGrade: '',
               };
             });
             if (!prune || !prune.length) {
@@ -156,6 +170,16 @@ async function exportToCsvs(auth) {
       });
     });
   });
+}
+
+function addHoursToDate(date, hours) {
+  return new Date(new Date(date).setHours(date.getHours() + hours));
+}
 
 
+function toExcelDate(date) {
+  return addHoursToDate(date, -new Date().getTimezoneOffset() / 60)
+  .toISOString()
+  .replace('T', ' ')
+  .replace('Z', '');
 }
