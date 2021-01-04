@@ -136,19 +136,25 @@ async function exportToCsvs(auth) {
             .filter(s => s.assignmentSubmission.attachments)
             .map(submission => {
               const updateTime = new Date(submission.updateTime);
+              const files = submission.assignmentSubmission.attachments && submission.assignmentSubmission.attachments.reduce(
+              (acc, current) => acc += (current.driveFile ? (current.driveFile.title + ',') : ''),
+              '');
+              const matchStudentId = files && files.match(/\d{6,10}/g);
+              const studentId = matchStudentId && matchStudentId[0];
               rowIndex++;
               return {
                 updateTime: toExcelDate(updateTime),
                 state: submission.state,
                 late: submission.late,
-                files: submission.assignmentSubmission.attachments && submission.assignmentSubmission.attachments.reduce(
-                (acc, current) => acc += (current.driveFile ? (current.driveFile.title + ',') : ''),
-                ''),
+                files,
                 deadline: toExcelDate(deadline),
                 lateHours: `=(A${rowIndex} - E${rowIndex}) * 60`,
+                studentId,
                 penalty: `=IF(F${rowIndex} <= 0, 1, IF(F${rowIndex} <= 2, 0.8, IF(F${rowIndex} <= 24, 0.5, 0)))`,
-                finalGrade: `=G${rowIndex} * I${rowIndex}`,
+                finalGrade: `=H${rowIndex} * J${rowIndex}`,
                 actualGrade: '',
+                studentId2: matchStudentId && matchStudentId[1],
+                studentId3: matchStudentId && matchStudentId[2],
               };
             });
             if (!prune || !prune.length) {
