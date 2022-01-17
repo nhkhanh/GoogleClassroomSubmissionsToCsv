@@ -101,21 +101,27 @@ async function exportToCsvs(auth) {
   }
   const classroom = google.classroom({ version: 'v1', auth });
   classroom.courses.list((err, res) => {
+    if (err) {
+      console.log(err);
+      console.log('Try delete token.json and run again');
+    }
+
     console.log('Courses list:');
     console.table(res.data.courses.map(course => ({ id: course.id, name: course.name })));
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
-    rl.question('Enter course id: ', (courseId) => {
+    rl.question('Enter the index that you want to export course\'s submission list: ', (index) => {
       rl.close();
+      const courseId = res.data.courses[index].id;
       classroom.courses.courseWork.list({ courseId }, (err, res) => {
         if (err) {
           console.log(err);
           return;
         }
         res.data.courseWork.forEach((courseWork => {
-          const deadline = new Date(courseWork.dueDate.year,
+          const deadline = courseWork.dueDate && new Date(courseWork.dueDate.year,
           courseWork.dueDate.month - 1,
           courseWork.dueDate.day,
           courseWork.dueTime.hours - new Date().getTimezoneOffset() / 60,
@@ -133,7 +139,7 @@ async function exportToCsvs(auth) {
               return;
             let rowIndex = 1;
             const prune = res.data.studentSubmissions
-            .filter(s => s.assignmentSubmission.attachments)
+            .filter(s => s.assignmentSubmission && s.assignmentSubmission.attachments)
             .map(submission => {
               const updateTime = new Date(submission.updateTime);
               const files = submission.assignmentSubmission.attachments && submission.assignmentSubmission.attachments.reduce(
@@ -147,7 +153,7 @@ async function exportToCsvs(auth) {
                 state: submission.state,
                 late: submission.late,
                 files,
-                deadline: toExcelDate(deadline),
+                deadline: deadline && toExcelDate(deadline),
                 lateHours: `=(A${rowIndex} - E${rowIndex}) * 60`,
                 studentId,
                 penalty: `=IF(F${rowIndex} <= 0, 1, IF(F${rowIndex} <= 2, 0.8, IF(F${rowIndex} <= 24, 0.5, 0)))`,
