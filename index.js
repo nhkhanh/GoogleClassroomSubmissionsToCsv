@@ -43,11 +43,11 @@ const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
  */
 async function loadSavedCredentialsIfExist() {
   try {
-    const content = await fs.readFile(TOKEN_PATH);
+    const content = await fs.promises.readFile(TOKEN_PATH);
     const credentials = JSON.parse(content);
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    return null;
+    console.error(err);
   }
 }
 
@@ -61,6 +61,8 @@ async function saveCredentials(client) {
   const content = await fs.promises.readFile(CREDENTIALS_PATH);
   const keys = JSON.parse(content);
   const key = keys.installed || keys.web;
+
+  // Unable to get refresh token? Visit https://stackoverflow.com/a/10857806/2353894
   const payload = JSON.stringify({
     type: 'authorized_user',
     client_id: key.client_id,
@@ -82,6 +84,10 @@ async function authorize() {
   client = await authenticate({
     scopes: SCOPES,
     keyfilePath: CREDENTIALS_PATH,
+    additionalOptions: {
+      access_type: 'offline',
+      prompt: 'consent',
+    },
   });
   if (client.credentials) {
     await saveCredentials(client);
