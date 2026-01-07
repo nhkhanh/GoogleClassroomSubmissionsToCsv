@@ -80,5 +80,6 @@ typings/
 .dynamodb/
 export/
 token.json
+token-sheets.json
 credentials.json
 .idea/

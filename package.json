@@ -12,7 +12,8 @@
     "node": ">=6.4.0"
   },
   "scripts": {
-    "start": "node ."
+    "start": "node .",
+    "import-sheets": "node import-to-sheets.js"
   },
   "license": "Apache-2.0"
 }
