@@ -47,7 +47,21 @@ async function loadSavedCredentialsIfExist() {
     const credentials = JSON.parse(content);
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    console.error(err);
+    return null;
+  }
+}
+
+/**
+ * Deletes the saved token file.
+ *
+ * @return {Promise<void>}
+ */
+async function deleteToken() {
+  try {
+    await fs.promises.unlink(TOKEN_PATH);
+    console.log('Deleted invalid token.json, re-authenticating...');
+  } catch (err) {
+    // Token file doesn't exist, ignore
   }
 }
 
@@ -79,7 +93,17 @@ async function saveCredentials(client) {
 async function authorize() {
   let client = await loadSavedCredentialsIfExist();
   if (client) {
-    return client;
+    // Test if the token is still valid
+    try {
+      await client.getAccessToken();
+      return client;
+    } catch (err) {
+      if (err.response?.data?.error === 'invalid_grant') {
+        await deleteToken();
+      } else {
+        throw err;
+      }
+    }
   }
   client = await authenticate({
     scopes: SCOPES,
@@ -107,8 +131,8 @@ async function exportToCsvs(auth) {
   const classroom = google.classroom({ version: 'v1', auth });
   classroom.courses.list((err, res) => {
     if (err) {
-      console.log(err);
-      console.log('Try delete token.json and run again');
+      console.error('Error listing courses:', err.message);
+      return;
     }
 
     console.log('Courses list:');
