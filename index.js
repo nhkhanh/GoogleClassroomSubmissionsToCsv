@@ -144,7 +144,8 @@ async function exportToCsvs(auth) {
     rl.question('Enter the index that you want to export course\'s submission list: ', (index) => {
       rl.close();
       const {id: courseId, name: courseName} = res.data.courses[index];
-      const courseFolder = `${EXPORT_DIRECTORY}/${courseName}`;
+      const safeName = courseName.replace(/[<>:"\/\\|?*]/g, '_');
+      const courseFolder = `${EXPORT_DIRECTORY}/${safeName}`;
       // Create course folder
       if (!fs.existsSync(courseFolder))
         fs.mkdirSync(courseFolder);
@@ -202,7 +203,8 @@ async function exportToCsvs(auth) {
             }
             const parser = new Json2csvParser();
             const csv = parser.parse(prune);
-            const fileName = `${courseFolder}/${courseWork.title}.csv`;
+            const safeTitle = courseWork.title.replace(/[<>:"\/\\|?*]/g, '_');
+            const fileName = `${courseFolder}/${safeTitle}.csv`;
 
             fs.writeFile(fileName, csv, err => {
               if (err)

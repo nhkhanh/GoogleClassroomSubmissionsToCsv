@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const { google } = require('googleapis');
 const { authenticate } = require('@google-cloud/local-auth');
 
@@ -9,18 +10,55 @@ const SCOPES = [
 
 const TOKEN_PATH = path.join(process.cwd(), 'token-sheets.json');
 const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+const EXPORT_DIR = path.join(process.cwd(), 'export');
 
-const CSV_DIRECTORY = process.argv[2];
-if (!CSV_DIRECTORY) {
-  console.error('Usage: node import-to-sheets.js <csv-directory>');
-  console.error('Example: node import-to-sheets.js ./export/2510-AWAD-22KTPM2');
-  process.exit(1);
+async function selectFolder() {
+  if (process.argv[2]) {
+    const dir = process.argv[2];
+    if (!fs.existsSync(dir)) {
+      console.error(`Error: Directory not found: ${dir}`);
+      process.exit(1);
+    }
+    return dir;
+  }
+
+  if (!fs.existsSync(EXPORT_DIR)) {
+    console.error(`Error: Export directory not found: ${EXPORT_DIR}`);
+    process.exit(1);
+  }
+
+  const folders = fs.readdirSync(EXPORT_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name)
+    .sort();
+
+  if (folders.length === 0) {
+    console.error('No subfolders found in export directory.');
+    process.exit(1);
+  }
+
+  console.log('Select a folder to import:\n');
+  folders.forEach((folder, i) => {
+    console.log(`  ${i + 1}. ${folder}`);
+  });
+  console.log();
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise(resolve => {
+    rl.question(`Enter number (1-${folders.length}): `, resolve);
+  });
+  rl.close();
+
+  const index = parseInt(answer, 10) - 1;
+  if (isNaN(index) || index < 0 || index >= folders.length) {
+    console.error('Invalid selection.');
+    process.exit(1);
+  }
+
+  return path.join(EXPORT_DIR, folders[index]);
 }
 
-if (!fs.existsSync(CSV_DIRECTORY)) {
-  console.error(`Error: Directory not found: ${CSV_DIRECTORY}`);
-  process.exit(1);
-}
+let CSV_DIRECTORY;
 
 async function loadSavedCredentialsIfExist() {
   try {
@@ -194,4 +232,11 @@ async function importCsvsToSheets(auth) {
   console.log(`https://docs.google.com/spreadsheets/d/${spreadsheetId}`);
 }
 
-authorize().then(importCsvsToSheets).catch(console.error);
+selectFolder()
+  .then(folder => {
+    CSV_DIRECTORY = folder;
+    console.log(`\nImporting from: ${CSV_DIRECTORY}\n`);
+    return authorize();
+  })
+  .then(importCsvsToSheets)
+  .catch(console.error);
