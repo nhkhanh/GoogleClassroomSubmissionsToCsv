@@ -181,6 +181,8 @@ async function exportToCsvs(auth) {
               '');
               const matchStudentId = files && files.match(/\d{6,10}/g);
               const studentId = matchStudentId && matchStudentId[0];
+              const gradeMatch = files && files.match(/_(\d{1,2})\.\w+/);
+              const actualGrade = gradeMatch ? gradeMatch[1] : '';
               rowIndex++;
               return {
                 updateTime: toExcelDate(updateTime),
@@ -192,7 +194,7 @@ async function exportToCsvs(auth) {
                 studentId,
                 penalty: `=IF(F${rowIndex} <= 0, 1, IF(F${rowIndex} <= 2, 0.8, IF(F${rowIndex} <= 24, 0.5, 0)))`,
                 finalGrade: `=H${rowIndex} * J${rowIndex}`,
-                actualGrade: '',
+                actualGrade,
                 studentId2: matchStudentId && matchStudentId[1],
                 studentId3: matchStudentId && matchStudentId[2],
               };
