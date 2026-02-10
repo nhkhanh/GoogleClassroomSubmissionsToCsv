@@ -181,8 +181,8 @@ async function exportToCsvs(auth) {
               '');
               const matchStudentId = files && files.match(/\d{6,10}/g);
               const studentId = matchStudentId && matchStudentId[0];
-              const gradeMatch = files && files.match(/_(\d{1,2})\.\w+/);
-              const actualGrade = gradeMatch ? gradeMatch[1] : '';
+              const gradeMatch = files && files.match(/[-_ ](\d{1,2}[.,]\d+|\d{1,2})\.\w+/);
+              const actualGrade = gradeMatch ? gradeMatch[1].replace(',', '.') : '';
               rowIndex++;
               return {
                 updateTime: toExcelDate(updateTime),
